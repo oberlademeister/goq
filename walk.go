@@ -2,45 +2,70 @@ package goq
 
 import "log"
 
-func (o *Object) WalkLeaves(fn func(key string, index int, i interface{})) {
+type WalkAbortError struct{}
+
+func (e *WalkAbortError) Error() string {
+	return "WalkAbortError"
+}
+
+func (o *Object) WalkLeaves(bfs bool, fn func(key string, index int, thisI, parentI interface{}) error) error {
 	type todoT struct {
-		i     interface{}
-		key   string
-		index int
+		i       interface{}
+		parentI interface{}
+		key     string
+		index   int
 	}
 
 	todo := []todoT{
 		{
-			i:     o.i,
-			key:   "",
-			index: 0,
+			i:       o.i,
+			parentI: nil,
+			key:     "",
+			index:   0,
 		},
 	}
 	for len(todo) > 0 {
-		this := todo[len(todo)-1]
-		todo = todo[:len(todo)-1]
+		var this todoT
+		// depth first search
+		if bfs {
+			this = todo[0]
+			todo = todo[1:]
+		} else {
+			this = todo[len(todo)-1]
+			todo = todo[:len(todo)-1]
+		}
 		switch v := this.i.(type) {
 		case string, float64, bool:
-			fn(this.key, this.index, this)
+			err := fn(this.key, this.index, this.i, this.parentI)
+			if err != nil {
+				return err
+			}
 			continue
 		case map[string]interface{}:
 			for k, v2 := range v {
 				switch v3 := v2.(type) {
 				case string, float64, bool:
-					fn(k, 0, v2)
+					todo = append(todo, todoT{
+						i:       v2,
+						parentI: this.i,
+						key:     k,
+						index:   0,
+					})
 					continue
 				case []interface{}:
 					todo = append(todo, todoT{
-						i:     v2,
-						key:   k,
-						index: 0,
+						i:       v2,
+						parentI: this.i,
+						key:     k,
+						index:   0,
 					})
 					continue
 				case map[string]interface{}:
 					todo = append(todo, todoT{
-						i:     v2,
-						key:   k,
-						index: 0,
+						i:       v2,
+						parentI: this.i,
+						key:     k,
+						index:   0,
 					})
 				default:
 					log.Printf("unknown type %t", v3)
@@ -50,20 +75,27 @@ func (o *Object) WalkLeaves(fn func(key string, index int, i interface{})) {
 			for i, v2 := range v {
 				switch v3 := v2.(type) {
 				case string, float64, bool:
-					fn("", i, v2)
+					todo = append(todo, todoT{
+						i:       v2,
+						parentI: this.i,
+						key:     "",
+						index:   i,
+					})
 					continue
 				case []interface{}:
 					todo = append(todo, todoT{
-						i:     v2,
-						key:   "",
-						index: i,
+						i:       v2,
+						parentI: this.i,
+						key:     "",
+						index:   i,
 					})
 					continue
 				case map[string]interface{}:
 					todo = append(todo, todoT{
-						i:     v2,
-						key:   "",
-						index: i,
+						i:       v2,
+						key:     "",
+						parentI: this.i,
+						index:   i,
 					})
 				default:
 					log.Printf("unknown type %t", v3)
@@ -71,5 +103,5 @@ func (o *Object) WalkLeaves(fn func(key string, index int, i interface{})) {
 			}
 		}
 	}
-
+	return nil
 }

@@ -1,0 +1,15 @@
+{
+    "title": "first",
+    "child": {
+        "title": "second",
+        "child": {
+            "title": "last",
+            "type": "container",
+            "child": [
+                {
+                    "title": "o1"
+                }
+            ]
+        }
+    }
+}
